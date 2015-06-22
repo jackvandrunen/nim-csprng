@@ -1,0 +1,4 @@
+nimcache/
+nrpltmp*
+salsa20
+*.py

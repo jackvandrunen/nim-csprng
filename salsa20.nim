@@ -7,6 +7,9 @@ type
         state: array[16, int32]
         rounds: int
         used: bool
+    KeyLengthError = object of Exception
+    NonceLengthError = object of Exception
+    EndOfStreamError = object of Exception
 
 
 const TAU = [int32(0x61707865), int32(0x3120646e), int32(0x79622d36), int32(0x6b206574)]
@@ -19,11 +22,8 @@ const i32One  = int32(1)
 proc `^=`[T](x: var T, y: T) {.gcSafe, noSideEffect, inline.} =
     x = x xor y
 
-proc `|=`[T](x: var T, y: T) {.gcSafe, noSideEffect, inline.} =
-    x = x or y
 
-
-proc rotate(a, b: int32): int32 {.gcSafe, noSideEffect, inline.} =
+proc rol32(a, b: int32): int32 {.gcSafe, noSideEffect, inline.} =
     (a shl b) or (a shr (32 - b))
 
 
@@ -41,11 +41,7 @@ proc toI8(input: char): int8 {.gcSafe, noSideEffect, inline.} =
 
 proc stringtoi32(input: string): int32 {.gcSafe, noSideEffect, inline.} =
     # little endian
-    result = i32Zero
-    result |= int32(input[0])
-    result |= int32(input[1]) shl 8
-    result |= int32(input[2]) shl 16
-    result |= int32(input[3]) shl 24
+    int32(input[0]) or (int32(input[1]) shl 8) or (int32(input[2]) shl 16) or (int32(input[3]) shl 24)
 
 
 proc i32tostring(input: int32): string {.gcSafe, noSideEffect, inline.} =
@@ -68,40 +64,44 @@ proc i32toi8(input: int32): array[4, int8] {.gcSafe, noSideEffect, inline.} =
 proc core(input: array[16, int32], rounds: int): array[16, int32] {.gcSafe, noSideEffect.} =
     var x = input
     for i in countDown(rounds, 2, 2):
-        x[ 4] ^= rotate(x[ 0] + x[12], 7)
-        x[ 8] ^= rotate(x[ 4] + x[ 0], 9)
-        x[12] ^= rotate(x[ 8] + x[ 4],13)
-        x[ 0] ^= rotate(x[12] + x[ 8],18)
-        x[ 9] ^= rotate(x[ 5] + x[ 1], 7)
-        x[13] ^= rotate(x[ 9] + x[ 5], 9)
-        x[ 1] ^= rotate(x[13] + x[ 9],13)
-        x[ 5] ^= rotate(x[ 1] + x[13],18)
-        x[14] ^= rotate(x[10] + x[ 6], 7)
-        x[ 2] ^= rotate(x[14] + x[10], 9)
-        x[ 6] ^= rotate(x[ 2] + x[14],13)
-        x[10] ^= rotate(x[ 6] + x[ 2],18)
-        x[ 3] ^= rotate(x[15] + x[11], 7)
-        x[ 7] ^= rotate(x[ 3] + x[15], 9)
-        x[11] ^= rotate(x[ 7] + x[ 3],13)
-        x[15] ^= rotate(x[11] + x[ 7],18)
-        x[ 1] ^= rotate(x[ 0] + x[ 3], 7)
-        x[ 2] ^= rotate(x[ 1] + x[ 0], 9)
-        x[ 3] ^= rotate(x[ 2] + x[ 1],13)
-        x[ 0] ^= rotate(x[ 3] + x[ 2],18)
-        x[ 6] ^= rotate(x[ 5] + x[ 4], 7)
-        x[ 7] ^= rotate(x[ 6] + x[ 5], 9)
-        x[ 4] ^= rotate(x[ 7] + x[ 6],13)
-        x[ 5] ^= rotate(x[ 4] + x[ 7],18)
-        x[11] ^= rotate(x[10] + x[ 9], 7)
-        x[ 8] ^= rotate(x[11] + x[10], 9)
-        x[ 9] ^= rotate(x[ 8] + x[11],13)
-        x[10] ^= rotate(x[ 9] + x[ 8],18)
-        x[12] ^= rotate(x[15] + x[14], 7)
-        x[13] ^= rotate(x[12] + x[15], 9)
-        x[14] ^= rotate(x[13] + x[12],13)
-        x[15] ^= rotate(x[14] + x[13],18)
+        x[ 4] ^= rol32(x[ 0] + x[12], 7)
+        x[ 8] ^= rol32(x[ 4] + x[ 0], 9)
+        x[12] ^= rol32(x[ 8] + x[ 4],13)
+        x[ 0] ^= rol32(x[12] + x[ 8],18)
+        x[ 9] ^= rol32(x[ 5] + x[ 1], 7)
+        x[13] ^= rol32(x[ 9] + x[ 5], 9)
+        x[ 1] ^= rol32(x[13] + x[ 9],13)
+        x[ 5] ^= rol32(x[ 1] + x[13],18)
+        x[14] ^= rol32(x[10] + x[ 6], 7)
+        x[ 2] ^= rol32(x[14] + x[10], 9)
+        x[ 6] ^= rol32(x[ 2] + x[14],13)
+        x[10] ^= rol32(x[ 6] + x[ 2],18)
+        x[ 3] ^= rol32(x[15] + x[11], 7)
+        x[ 7] ^= rol32(x[ 3] + x[15], 9)
+        x[11] ^= rol32(x[ 7] + x[ 3],13)
+        x[15] ^= rol32(x[11] + x[ 7],18)
+        x[ 1] ^= rol32(x[ 0] + x[ 3], 7)
+        x[ 2] ^= rol32(x[ 1] + x[ 0], 9)
+        x[ 3] ^= rol32(x[ 2] + x[ 1],13)
+        x[ 0] ^= rol32(x[ 3] + x[ 2],18)
+        x[ 6] ^= rol32(x[ 5] + x[ 4], 7)
+        x[ 7] ^= rol32(x[ 6] + x[ 5], 9)
+        x[ 4] ^= rol32(x[ 7] + x[ 6],13)
+        x[ 5] ^= rol32(x[ 4] + x[ 7],18)
+        x[11] ^= rol32(x[10] + x[ 9], 7)
+        x[ 8] ^= rol32(x[11] + x[10], 9)
+        x[ 9] ^= rol32(x[ 8] + x[11],13)
+        x[10] ^= rol32(x[ 9] + x[ 8],18)
+        x[12] ^= rol32(x[15] + x[14], 7)
+        x[13] ^= rol32(x[12] + x[15], 9)
+        x[14] ^= rol32(x[13] + x[12],13)
+        x[15] ^= rol32(x[14] + x[13],18)
     for i in countUp(0, 15, 1):
         result[i] = x[i] + input[i]
+
+
+proc reset*(cipher: Salsa20) {.gcSafe, noSideEffect.} =
+    cipher.state = cipher.iv
 
 
 proc newkey*(cipher: Salsa20, key: array[8, int32]) {.gcSafe, noSideEffect.} =
@@ -145,7 +145,7 @@ proc newiv*(cipher: Salsa20, iv: array[2, int32]) {.gcSafe, noSideEffect.} =
     cipher.iv[7] = iv[1]
     cipher.iv[8] = i32Zero
     cipher.iv[9] = i32Zero
-    cipher.state = cipher.iv
+    cipher.reset()
 
 
 proc salsa20*(key: array[8, int32], iv: array[2, int32], rounds: ROUND_COUNT): Salsa20 {.gcSafe, noSideEffect.} =
@@ -158,6 +158,29 @@ proc salsa20*(key: array[4, int32], iv: array[2, int32], rounds: ROUND_COUNT): S
     result.newkey(key)
     result.newiv(iv)
 
+proc salsa20*(key, iv: string, rounds: ROUND_COUNT): Salsa20 {.gcSafe, noSideEffect, raises: [KeyLengthError, NonceLengthError].} =
+    if iv.len != 8:
+        raise newException(NonceLengthError, "Nonce must be 64 bits (8 bytes)")
+    result = Salsa20(rounds: int(rounds), used: false)
+    case key.len:
+    of 32:
+        var keyarray: array[8, int32]
+        var y = 0
+        for i in countUp(0, 28, 4):
+            keyarray[y] = stringtoi32(key.substr(i, i+3))
+            inc y
+        result.newkey(keyarray)
+    of 16:
+        var keyarray: array[4, int32]
+        var y = 0
+        for i in countUp(0, 12, 4):
+            keyarray[y] = stringtoi32(key.substr(i, i+3))
+            inc y
+        result.newkey(keyarray)
+    else:
+        raise newException(KeyLengthError, "Key must be either 256 bits (32 bytes) or 128 bits (16 bytes)")
+    result.newiv([stringtoi32(iv.substr(0, 3)), stringtoi32(iv.substr(4, 7))])
+
 
 proc next*(cipher: Salsa20): array[16, int32] {.gcSafe, noSideEffect.} =
     result = core(cipher.state, cipher.rounds)
@@ -166,7 +189,9 @@ proc next*(cipher: Salsa20): array[16, int32] {.gcSafe, noSideEffect.} =
         cipher.state[9] += i32One
 
 
-proc randbytes*(cipher: Salsa20, count: int): string {.gcSafe, noSideEffect.} =
+proc randbytes*(cipher: Salsa20, count: int): string {.gcSafe, noSideEffect, raises: [EndOfStreamError].} =
+    if cipher.used:
+        raise newException(EndOfStreamError, "A block of <64 bytes has already been read.")
     result = newString(count)
     var y = 0
     var output: array[16, int32]
@@ -175,13 +200,17 @@ proc randbytes*(cipher: Salsa20, count: int): string {.gcSafe, noSideEffect.} =
             output = cipher.next()
             for i in output:
                 for chr in i32tostring(i):
-                    if y >= count:
-                        break outputloop
                     result[y] = chr
                     inc y
+                    if y >= count:
+                        if count mod 64 != 0:
+                            cipher.used = true
+                        break outputloop
 
 
-proc randints*(cipher: Salsa20, count: int): seq[int8] {.gcSafe, noSideEffect.} =
+proc randints*(cipher: Salsa20, count: int): seq[int8] {.gcSafe, noSideEffect, raises: [EndOfStreamError].} =
+    if cipher.used:
+        raise newException(EndOfStreamError, "A block of <64 bytes has already been read.")
     result = newSeq[int8](count)
     var y = 0
     var output: array[16, int32]
@@ -190,27 +219,20 @@ proc randints*(cipher: Salsa20, count: int): seq[int8] {.gcSafe, noSideEffect.} 
             output = cipher.next()
             for i in output:
                 for j in i32toi8(i):
-                    if y >= count:
-                        break outputloop
                     result[y] = j
                     inc y
+                    if y >= count:
+                        if count mod 64 != 0:
+                            cipher.used = true
+                        break outputloop
 
 
-proc encrypt*(cipher: Salsa20, message: string): string {.gcSafe, noSideEffect.} =
+proc encrypt*(cipher: Salsa20, message: string): string {.gcSafe, noSideEffect, raises: [EndOfStreamError].} =
     var stream = cipher.randints(message.len)
     result = newString(message.len)
     for i in countUp(0, message.len - 1):
         result[i] = toChar(toI8(message[i]) xor stream[i])
 
 
-for i in core([i32Zero,i32One,int32(2),int32(3),int32(4),int32(5),int32(6),int32(7),int32(8),int32(9),int32(10),int32(11),int32(12),int32(13),int32(14),int32(15)], 20):
-    echo cast[uint32](i)
-
-
-import hex
-
-
-var bleh = salsa20([int32(0x0), int32(0x0), int32(0x0), int32(0x0), int32(0x0), int32(0x0), int32(0x0), int32(0x0)], [int32(0x0), int32(0x0)], TWENTY)
-echo hex.encode(bleh.randbytes(64))
-# for i in bleh.randints():
-#     echo cast[uint32](i)
+proc decrypt*(cipher: Salsa20, message: string): string {.gcSafe, noSideEffect, inline, raises: [EndOfStreamError].} =
+    cipher.encrypt(message)

@@ -5,12 +5,15 @@ type
         iv: array[16, int32]
         key: array[16, int32]
         state: array[16, int32]
-        rounds: ROUND_COUNT
+        rounds: int
         used: bool
 
 
 const TAU = [int32(0x61707865), int32(0x3120646e), int32(0x79622d36), int32(0x6b206574)]
 const SIGMA = [int32(0x61707865), int32(0x3320646e), int32(0x79622d32), int32(0x6b206574)]
+
+const i32Zero = int32(0)
+const i32One  = int32(1)
 
 
 proc `^=`[T](x: var T, y: T) {.gcSafe, noSideEffect, inline.} =
@@ -24,9 +27,21 @@ proc rotate(a, b: int32): int32 {.gcSafe, noSideEffect, inline.} =
     (a shl b) or (a shr (32 - b))
 
 
+proc toChar(input: int8): char {.gcSafe, noSideEffect, inline.} =
+    char(input and 255)
+
+
+proc toI8(input: uint8): int8 {.gcSafe, noSideEffect, inline.} =
+    cast[int8](input)
+
+
+proc toI8(input: char): int8 {.gcSafe, noSideEffect, inline.} =
+    cast[int8](input)
+
+
 proc stringtoi32(input: string): int32 {.gcSafe, noSideEffect, inline.} =
     # little endian
-    result = int32(0)
+    result = i32Zero
     result |= int32(input[0])
     result |= int32(input[1]) shl 8
     result |= int32(input[2]) shl 16
@@ -42,9 +57,17 @@ proc i32tostring(input: int32): string {.gcSafe, noSideEffect, inline.} =
     result[3] = char((input shr 24) and 255)
 
 
-proc core(input: array[16, int32], rounds: ROUND_COUNT): array[16, int32] {.gcSafe, noSideEffect.} =
+proc i32toi8(input: int32): array[4, int8] {.gcSafe, noSideEffect, inline.} =
+    # little endian
+    result[0] = toI8(uint8(input and 255))
+    result[1] = toI8(uint8((input shr 8) and 255))
+    result[2] = toI8(uint8((input shr 16) and 255))
+    result[3] = toI8(uint8((input shr 24) and 255))
+
+
+proc core(input: array[16, int32], rounds: int): array[16, int32] {.gcSafe, noSideEffect.} =
     var x = input
-    for i in countDown(int(rounds), 2, 2):
+    for i in countDown(rounds, 2, 2):
         x[ 4] ^= rotate(x[ 0] + x[12], 7)
         x[ 8] ^= rotate(x[ 4] + x[ 0], 9)
         x[12] ^= rotate(x[ 8] + x[ 4],13)
@@ -82,7 +105,9 @@ proc core(input: array[16, int32], rounds: ROUND_COUNT): array[16, int32] {.gcSa
 
 
 proc newkey*(cipher: Salsa20, key: array[8, int32]) {.gcSafe, noSideEffect.} =
-    cipher.key = [int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0)]
+    cipher.key = [i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
+                  i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
+                  i32Zero, i32Zero, i32Zero, i32Zero]
     cipher.key[0]  = SIGMA[0]
     cipher.key[1]  = key[0]
     cipher.key[2]  = key[1]
@@ -97,7 +122,9 @@ proc newkey*(cipher: Salsa20, key: array[8, int32]) {.gcSafe, noSideEffect.} =
     cipher.key[15] = SIGMA[3]
 
 proc newkey*(cipher: Salsa20, key: array[4, int32]) {.gcSafe, noSideEffect.} =
-    cipher.key = [int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0), int32(0)]
+    cipher.key = [i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
+                  i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
+                  i32Zero, i32Zero, i32Zero, i32Zero]
     cipher.key[0]  = TAU[0]
     cipher.key[1]  = key[0]
     cipher.key[2]  = key[1]
@@ -116,27 +143,27 @@ proc newiv*(cipher: Salsa20, iv: array[2, int32]) {.gcSafe, noSideEffect.} =
     cipher.iv = cipher.key
     cipher.iv[6] = iv[0]
     cipher.iv[7] = iv[1]
-    cipher.iv[8] = int32(0)
-    cipher.iv[9] = int32(0)
+    cipher.iv[8] = i32Zero
+    cipher.iv[9] = i32Zero
     cipher.state = cipher.iv
 
 
 proc salsa20*(key: array[8, int32], iv: array[2, int32], rounds: ROUND_COUNT): Salsa20 {.gcSafe, noSideEffect.} =
-    result = Salsa20(rounds: rounds, used: false)
+    result = Salsa20(rounds: int(rounds), used: false)
     result.newkey(key)
     result.newiv(iv)
 
 proc salsa20*(key: array[4, int32], iv: array[2, int32], rounds: ROUND_COUNT): Salsa20 {.gcSafe, noSideEffect.} =
-    result = Salsa20(rounds: rounds, used: false)
+    result = Salsa20(rounds: int(rounds), used: false)
     result.newkey(key)
     result.newiv(iv)
 
 
-proc randints*(cipher: Salsa20): array[16, int32] {.gcSafe, noSideEffect.} =
+proc next*(cipher: Salsa20): array[16, int32] {.gcSafe, noSideEffect.} =
     result = core(cipher.state, cipher.rounds)
-    cipher.state[8] += int32(1)
-    if cipher.state[8] == int32(0):
-        cipher.state[9] += int32(1)
+    cipher.state[8] += i32One
+    if cipher.state[8] == i32Zero:
+        cipher.state[9] += i32One
 
 
 proc randbytes*(cipher: Salsa20, count: int): string {.gcSafe, noSideEffect.} =
@@ -145,24 +172,39 @@ proc randbytes*(cipher: Salsa20, count: int): string {.gcSafe, noSideEffect.} =
     var output: array[16, int32]
     block outputloop:
         while true:
-            output = cipher.randints()
+            output = cipher.next()
             for i in output:
                 for chr in i32tostring(i):
-                    result[y] = chr
-                    inc y
                     if y >= count:
                         break outputloop
+                    result[y] = chr
+                    inc y
 
 
-# proc encrypt*(cipher: Salsa20, message: string): string {.gcSafe, noSideEffect.} =
-#     var stream = cipher.getbytes(message.len)
-#     result = newString(message.len)
-#     for i in countUp(0, message.len - 1):
-#         result = message[i] xor stream[i]
+proc randints*(cipher: Salsa20, count: int): seq[int8] {.gcSafe, noSideEffect.} =
+    result = newSeq[int8](count)
+    var y = 0
+    var output: array[16, int32]
+    block outputloop:
+        while true:
+            output = cipher.next()
+            for i in output:
+                for j in i32toi8(i):
+                    if y >= count:
+                        break outputloop
+                    result[y] = j
+                    inc y
 
 
-# for i in core([int32(0),int32(1),int32(2),int32(3),int32(4),int32(5),int32(6),int32(7),int32(8),int32(9),int32(10),int32(11),int32(12),int32(13),int32(14),int32(15)], TWENTY):
-#     echo cast[uint32](i)
+proc encrypt*(cipher: Salsa20, message: string): string {.gcSafe, noSideEffect.} =
+    var stream = cipher.randints(message.len)
+    result = newString(message.len)
+    for i in countUp(0, message.len - 1):
+        result[i] = toChar(toI8(message[i]) xor stream[i])
+
+
+for i in core([i32Zero,i32One,int32(2),int32(3),int32(4),int32(5),int32(6),int32(7),int32(8),int32(9),int32(10),int32(11),int32(12),int32(13),int32(14),int32(15)], 20):
+    echo cast[uint32](i)
 
 
 import hex

@@ -1,3 +1,6 @@
+import utils
+
+
 type
     ROUND_COUNT* = enum
         EIGHT = 8, TWELVE = 12, TWENTY = 20
@@ -42,15 +45,6 @@ proc toI8(input: char): int8 {.noSideEffect, inline.} =
 proc stringtoi32(input: string): int32 {.noSideEffect, inline.} =
     # little endian
     int32(input[0]) or (int32(input[1]) shl 8) or (int32(input[2]) shl 16) or (int32(input[3]) shl 24)
-
-
-proc i32tostring(input: int32): string {.noSideEffect, inline.} =
-    # little endian
-    result = newString(4)
-    result[0] = char(input and 255)
-    result[1] = char((input shr 8) and 255)
-    result[2] = char((input shr 16) and 255)
-    result[3] = char((input shr 24) and 255)
 
 
 proc i32toi8(input: int32): array[4, int8] {.noSideEffect, inline.} =

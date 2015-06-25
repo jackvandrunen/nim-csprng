@@ -3,7 +3,7 @@ type
 
 
 when defined(windows):
-    import winlean, utils
+    import winlean
 
     type ULONG_PTR = int
     type HCRYPTPROV = ULONG_PTR
@@ -38,18 +38,10 @@ when defined(windows):
         raise newException(RandomError, "Call to CryptAcquireContext failed")
 
     proc urandom*(count: int): seq[char] {.raises: [RandomError].} =
-        var output: int32
-        var y = 0
         result = newSeq[char](count)
-        while true:
-            let success = CryptGenRandom(cryptProv, DWORD(size), addr output)
-            if success == 0:
-                raise newException(OSError, "Call to CryptGenRandom failed")
-            for chr in i32tostring(output):
-                result[y] = chr
-                inc y
-                if y >= count:
-                    break
+        for i in countUp(0, count - 1, 1):
+          if CryptGenRandom(cryptProv, DWORD(8), addr result[i]) == 0:
+              raise newException(RandomError, "Call to CryptGenRandom failed")
 
 else:
     proc urandom*(count: int): seq[char] {.raises: [RandomError].} =

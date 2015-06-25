@@ -55,6 +55,15 @@ proc i32toi8(input: int32): array[4, int8] {.noSideEffect, inline.} =
     result[3] = toI8(uint8((input shr 24) and 255))
 
 
+proc i32tostring*(input: int32): string {.noSideEffect, inline.} =
+    # little endian
+    result = newString(4)
+    result[0] = char(input and 255)
+    result[1] = char((input shr 8) and 255)
+    result[2] = char((input shr 16) and 255)
+    result[3] = char((input shr 24) and 255)
+
+
 proc core(input: array[16, int32], rounds: int): array[16, int32] {.noSideEffect.} =
     var x = input
     for i in countDown(rounds, 2, 2):

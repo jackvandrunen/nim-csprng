@@ -1,6 +1,3 @@
-import utils
-
-
 type
     ROUND_COUNT* = enum
         EIGHT = 8, TWELVE = 12, TWENTY = 20
@@ -103,10 +100,6 @@ proc core(input: array[16, int32], rounds: int): array[16, int32] {.noSideEffect
         result[i] = x[i] +% input[i]
 
 
-proc reset*(cipher: Salsa20) {.noSideEffect.} =
-    cipher.state = cipher.iv
-
-
 proc newkey*(cipher: Salsa20, key: array[8, int32]) {.noSideEffect.} =
     cipher.key = [i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
                   i32Zero, i32Zero, i32Zero, i32Zero, i32Zero, i32Zero,
@@ -148,7 +141,7 @@ proc newiv*(cipher: Salsa20, iv: array[2, int32]) {.noSideEffect.} =
     cipher.iv[7] = iv[1]
     cipher.iv[8] = i32Zero
     cipher.iv[9] = i32Zero
-    cipher.reset()
+    cipher.state = cipher.iv
 
 
 proc salsa20*(key: array[8, int32], iv: array[2, int32], rounds: ROUND_COUNT): Salsa20 {.noSideEffect.} =

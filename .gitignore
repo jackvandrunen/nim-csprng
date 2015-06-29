@@ -2,6 +2,5 @@ nimcache/
 nrpltmp*
 salsa20
 random
-tests
+tests*
 *.py
-tests.nim

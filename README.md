@@ -7,11 +7,8 @@ expected.
 
 > &mdash; *The Two Towers*, JRR Tolkien
 
-The Stormcrow library is a pure Nim library designed for authenticated
-encryption and key exchange, with an emphasis on real-time communication.
-Stormcrow uses well-vetted standards from the crypto community, and the
-implementations are designed to be simple enough to be audited and tested
-easily.
+Stormcrow is a pure Nim library for authenticated encryption and key exchange,
+with an emphasis on real-time communication.
 
 ### Currently Implemented Features:
 
@@ -22,6 +19,3 @@ easily.
 
 - Blake2
 - Curve25519
-
-I'm sure that I look like a djb freak, but the choices of algorithms are pretty
-standard.
